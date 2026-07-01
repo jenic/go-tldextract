@@ -94,16 +94,16 @@ func extractHost(s string) string {
 	}
 
 	// Manual cleanup for bare host, host:port, [v6]:port, creds@host…
-	// Strip creds
-	if at := strings.LastIndex(s, "@"); at != -1 {
-		s = s[at+1:]
-	}
 	// Cut at first / ? #
 	for i, ch := range s {
 		if ch == '/' || ch == '?' || ch == '#' {
 			s = s[:i]
 			break
 		}
+	}
+	// Strip creds
+	if at := strings.LastIndex(s, "@"); at != -1 {
+		s = s[at+1:]
 	}
 	// Strip :port (keeps IPv6 literals in [::1])
 	if strings.HasPrefix(s, "[") && strings.Contains(s, "]") {
