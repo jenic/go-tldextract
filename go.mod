@@ -1,4 +1,4 @@
-module example.com/tldextract
+module github.com/jenic/go-tldextract
 
 go 1.25.11
 

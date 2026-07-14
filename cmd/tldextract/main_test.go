@@ -1,93 +1,36 @@
 package main
 
-import "testing"
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
-func TestExtractHost(t *testing.T) {
-	tests := []struct {
-		name string
-		in   string
-		want string
-	}{
-		{
-			name: "bare host",
-			in:   "example.com",
-			want: "example.com",
-		},
-		{
-			name: "bare host with trailing dot",
-			in:   "example.com.",
-			want: "example.com",
-		},
-		{
-			name: "bare host with port",
-			in:   "example.com:443",
-			want: "example.com",
-		},
-		{
-			name: "bracketed ipv6 with port",
-			in:   "[2001:db8::1]:443",
-			want: "2001:db8::1",
-		},
-		{
-			name: "bare userinfo",
-			in:   "user:pass@example.com:443",
-			want: "example.com",
-		},
-		{
-			name: "url userinfo",
-			in:   "https://user:pass@example.com:443/path@evil.com",
-			want: "example.com",
-		},
-		{
-			name: "path at sign does not replace host",
-			in:   "example.com/path@evil.com",
-			want: "example.com",
-		},
-		{
-			name: "query at sign does not replace host",
-			in:   "example.com?x=@evil.com",
-			want: "example.com",
-		},
-		{
-			name: "fragment at sign does not replace host",
-			in:   "example.com#@evil.com",
-			want: "example.com",
-		},
-		{
-			name: "path query at sign does not replace host",
-			in:   "example.com/path?x=@evil.com",
-			want: "example.com",
-		},
+func TestRunStdin(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	err := run(nil, strings.NewReader("https://www.example.com/path\nwww.example.co.uk:443\nexample.com\nlocalhost\n"), &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := extractHost(tt.in); got != tt.want {
-				t.Fatalf("extractHost(%q) = %q, want %q", tt.in, got, tt.want)
-			}
-		})
+	if got, want := stdout.String(), "example.co.uk\nexample.com\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
 	}
 }
 
-func FuzzExtractHostIgnoresDelimitedSuffixUserinfo(f *testing.F) {
-	for _, seed := range []string{
-		"@evil.com",
-		"x=@evil.com",
-		"user:pass@evil.com",
-		"%40evil.com",
-		"nested/path@evil.com",
-		"query?x=@evil.com",
-		"fragment#@evil.com",
-	} {
-		f.Add(seed)
+func TestRunPunycodeFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "input.txt")
+	if err := os.WriteFile(path, []byte("www.b\u00fccher.de\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 
-	f.Fuzz(func(t *testing.T, suffix string) {
-		for _, delimiter := range []string{"/", "?", "#"} {
-			input := "example.com" + delimiter + suffix
-			if got := extractHost(input); got != "example.com" {
-				t.Fatalf("extractHost(%q) = %q, want example.com", input, got)
-			}
-		}
-	})
+	var stdout, stderr bytes.Buffer
+	err := run([]string{"-punycode", path}, strings.NewReader(""), &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run() error = %v", err)
+	}
+	if got, want := stdout.String(), "xn--bcher-kva.de\n"; got != want {
+		t.Fatalf("stdout = %q, want %q", got, want)
+	}
 }

@@ -1,7 +1,7 @@
 # tldextract
 
-`tldextract` is a small Go CLI that reads hostnames or URLs and prints the
-unique registrable domains found in the input.
+`tldextract` is a Go library and CLI for extracting registrable domains from
+hostnames or URLs.
 
 It uses the public suffix list from `golang.org/x/net/publicsuffix`, so inputs
 such as `www.example.co.uk` resolve to `example.co.uk` instead of just
@@ -22,7 +22,47 @@ such as `www.example.co.uk` resolve to `example.co.uk` instead of just
 
 - Go 1.25.11 or newer.
 
-## Usage
+## Library Usage
+
+Install the module in a Go project:
+
+```sh
+go get github.com/jenic/go-tldextract
+```
+
+Extract one domain and explicitly handle input without a registrable domain:
+
+```go
+import (
+	"errors"
+	"fmt"
+
+	tldextract "github.com/jenic/go-tldextract"
+)
+
+domain, err := tldextract.Extract("https://www.example.co.uk/path", tldextract.Options{})
+if err != nil {
+	if errors.Is(err, tldextract.ErrNoRegistrableDomain) {
+		// The input was an IP address, local name, comment, or invalid domain.
+		return
+	}
+	panic(err)
+}
+fmt.Println(domain) // example.co.uk
+```
+
+Use `Options{Punycode: true}` for ASCII IDNA output. `ExtractAll` accepts a
+slice of inputs, ignores values returning `ErrNoRegistrableDomain`, and returns
+unique domains in sorted order:
+
+```go
+domains, err := tldextract.ExtractAll(inputs, tldextract.Options{Punycode: true})
+if err != nil {
+	panic(err)
+}
+```
+
+## CLI Usage
 
 Run from stdin:
 
@@ -101,7 +141,7 @@ go test ./...
 Run the fuzz target for host parsing:
 
 ```sh
-go test ./cmd/tldextract -run '^$' -fuzz=FuzzExtractHostIgnoresDelimitedSuffixUserinfo -fuzztime=10s
+go test . -run '^$' -fuzz=FuzzExtractHostIgnoresDelimitedSuffixUserinfo -fuzztime=10s
 ```
 
 The fuzz target covers cases where path, query, or fragment text contains
