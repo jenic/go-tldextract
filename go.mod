@@ -1,6 +1,6 @@
 module github.com/jenic/go-tldextract
 
-go 1.25.11
+go 1.25.12
 
 require golang.org/x/net v0.55.0
 
